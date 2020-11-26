@@ -41,16 +41,15 @@ extern struct cpuinfo_csky cpu_data[];
 #define TASK_UNMAPPED_BASE      (TASK_SIZE / 3)
 
 struct thread_struct {
-	unsigned long  ksp;       /* kernel stack pointer */
-	unsigned long  sr;        /* saved status register */
+	unsigned long  sp;        /* kernel stack pointer */
+	unsigned long  trap_no;   /* saved status register */
 
 	/* FPU regs */
 	struct user_fp __aligned(16) user_fp;
 };
 
 #define INIT_THREAD  { \
-	.ksp = (unsigned long) init_thread_union.stack + THREAD_SIZE, \
-	.sr = DEFAULT_PSR_VALUE, \
+	.sp = sizeof(init_stack) + (unsigned long) &init_stack, \
 }
 
 /*
@@ -83,19 +82,13 @@ static inline void release_thread(struct task_struct *dead_task)
 
 extern int kernel_thread(int (*fn)(void *), void *arg, unsigned long flags);
 
-#define copy_segments(tsk, mm)		do { } while (0)
-#define release_segments(mm)		do { } while (0)
-#define forget_segments()		do { } while (0)
-
-extern unsigned long thread_saved_pc(struct task_struct *tsk);
-
 unsigned long get_wchan(struct task_struct *p);
 
 #define KSTK_EIP(tsk)		(task_pt_regs(tsk)->pc)
 #define KSTK_ESP(tsk)		(task_pt_regs(tsk)->usp)
 
 #define task_pt_regs(p) \
-	((struct pt_regs *)(THREAD_SIZE + p->stack) - 1)
+	((struct pt_regs *)(THREAD_SIZE + task_stack_page(p)) - 1)
 
 #define cpu_relax() barrier()
 

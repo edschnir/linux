@@ -55,11 +55,11 @@
 #define TASKLET_MAX_TIME 2
 #define TASKLET_MAX_TIME_JIFFIES msecs_to_jiffies(TASKLET_MAX_TIME)
 
-void mlx4_cq_tasklet_cb(unsigned long data)
+void mlx4_cq_tasklet_cb(struct tasklet_struct *t)
 {
 	unsigned long flags;
 	unsigned long end = jiffies + TASKLET_MAX_TIME_JIFFIES;
-	struct mlx4_eq_tasklet *ctx = (struct mlx4_eq_tasklet *)data;
+	struct mlx4_eq_tasklet *ctx = from_tasklet(ctx, t, task);
 	struct mlx4_cq *mcq, *temp;
 
 	spin_lock_irqsave(&ctx->lock, flags);
@@ -306,14 +306,16 @@ static int mlx4_init_user_cqes(void *buf, int entries, int cqe_size)
 
 	if (entries_per_copy < entries) {
 		for (i = 0; i < entries / entries_per_copy; i++) {
-			err = copy_to_user(buf, init_ents, PAGE_SIZE);
+			err = copy_to_user((void __user *)buf, init_ents, PAGE_SIZE) ?
+				-EFAULT : 0;
 			if (err)
 				goto out;
 
 			buf += PAGE_SIZE;
 		}
 	} else {
-		err = copy_to_user(buf, init_ents, entries * cqe_size);
+		err = copy_to_user((void __user *)buf, init_ents, entries * cqe_size) ?
+			-EFAULT : 0;
 	}
 
 out:

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * ATAPI support.
  */
@@ -235,21 +236,28 @@ EXPORT_SYMBOL_GPL(ide_prep_sense);
 
 int ide_queue_sense_rq(ide_drive_t *drive, void *special)
 {
-	struct request *sense_rq = drive->sense_rq;
+	ide_hwif_t *hwif = drive->hwif;
+	struct request *sense_rq;
+	unsigned long flags;
+
+	spin_lock_irqsave(&hwif->lock, flags);
 
 	/* deferred failure from ide_prep_sense() */
 	if (!drive->sense_rq_armed) {
 		printk(KERN_WARNING PFX "%s: error queuing a sense request\n",
 		       drive->name);
+		spin_unlock_irqrestore(&hwif->lock, flags);
 		return -ENOMEM;
 	}
 
+	sense_rq = drive->sense_rq;
 	ide_req(sense_rq)->special = special;
 	drive->sense_rq_armed = false;
 
 	drive->hwif->rq = NULL;
 
 	ide_insert_request_head(drive, sense_rq);
+	spin_unlock_irqrestore(&hwif->lock, flags);
 	return 0;
 }
 EXPORT_SYMBOL_GPL(ide_queue_sense_rq);
@@ -601,7 +609,7 @@ static int ide_delayed_transfer_pc(ide_drive_t *drive)
 
 static ide_startstop_t ide_transfer_pc(ide_drive_t *drive)
 {
-	struct ide_atapi_pc *uninitialized_var(pc);
+	struct ide_atapi_pc *pc;
 	ide_hwif_t *hwif = drive->hwif;
 	struct request *rq = hwif->rq;
 	ide_expiry_t *expiry;
